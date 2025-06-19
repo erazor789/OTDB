@@ -1,0 +1,304 @@
+﻿<!DOCTYPE html> 
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>OPEN TALENT DATABASE</title>
+<style>
+    body {
+      font-family: system-ui;
+      margin: 0;
+      padding: 2rem;
+      background: #121212;
+      color: #e0e0e0;
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 1rem;
+      color: #ffffff;
+    }
+    button, input, select {
+      background-color: #333;
+      color: #eee;
+      border: 1px solid #555;
+      border-radius: 4px;
+    }
+    button {
+      display: block;
+      margin: 1rem auto;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #444;
+    }
+    #filters {
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+    #filters label {
+      margin: 0 1rem;
+      font-weight: 600;
+    }
+    table {
+      border-collapse: collapse;
+      margin: 0 auto;
+      width: 90%;
+      max-width: 1000px;
+      table-layout: fixed;
+      background-color: #1e1e1e;
+      color: #ccc;
+    }
+    th, td {
+      border: 1px solid #444;
+      padding: 0.5rem;
+      text-align: left;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      height: auto;
+      vertical-align: top;
+    }
+    th {
+      background: #2a2a2a;
+    }
+    tr:nth-child(even) {
+      background-color: #1a1a1a;
+    }
+    tr:hover {
+      background-color: #2a2a2a;
+    }
+    th.sortable:hover {
+      background-color: #333;
+      cursor: pointer;
+    }
+    th.sorted-asc::after {
+      content: " ▲";
+    }
+    th.sorted-desc::after {
+      content: " ▼";
+    }
+    td img {
+      display: block;
+      margin: 0 auto;
+      max-width: 150px;
+      max-height: 150px;
+      object-fit: contain;
+      background-color: #000;
+    }
+    a {
+      color: #80d0ff;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    .view-link-btn {
+      padding: 4px 8px;
+      font-size: 0.9em;
+      background-color: #444;
+      color: #fff;
+      border: 1px solid #666;
+    }
+    .view-link-btn:hover {
+      background-color: #555;
+    }
+  </style>
+</head>
+<body>
+  <h2>OPEN TALENT DATABASE</h2>
+
+  <div id="filters">
+    <label>
+      Talent Filter:
+      <input type="text" id="filterTalent" placeholder="Filter by Talent" />
+    </label>
+    <label>
+      Gender:
+      <select id="filterGender">
+        <option value="">All</option>
+        <option value="Male">Male</option>
+        <option value="Female">Female</option>
+        <option value="Other">Other</option>
+      </select>
+    </label>
+  </div>
+
+  <button id="downloadBtn">Download Shortlist as CSV</button>
+
+  <table id="sheet">
+    <colgroup>
+      <col style="width: 30px;">
+      <col style="width: 120px;">
+      <col style="width: 180px;">
+      <col style="width: 150px;">
+      <col style="width: 200px;">
+      <col style="width: 80px;">
+      <col style="width: 50px;">
+      <col style="width: 100px;">
+      <col style="width: 400px;">
+      <col style="width: 250px;">
+      <col style="width: 150px;">
+      <col style="width: 80px;">
+    </colgroup>
+    <thead></thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    (async () => {
+      const sheetId = '13gnsjtwG1HQFGXuTcdg_gmV_AartHkbzvLus_QdyNFA';
+      const sheetName = 'Form Responses 1';
+      const url = `https://opensheet.elk.sh/${sheetId}/${encodeURIComponent(sheetName)}`;
+      const data = await fetch(url).then(r => r.json());
+      if (!data.length) return;
+
+      let filtered = data.slice();
+
+      const thead = document.querySelector('#sheet thead');
+      const tbody = document.querySelector('#sheet tbody');
+      const cols = Object.keys(data[0] || {});
+      const shortlist = new Set();
+      let sortState = [];
+
+      const filterTalentInput = document.getElementById('filterTalent');
+      const filterGenderSelect = document.getElementById('filterGender');
+
+      function linkify(text) {
+        if (!text) return '';
+        const urlPattern = /https?:\/\/[^\s]+/g;
+        return text.replace(urlPattern, url =>
+          `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`
+        );
+      }
+
+      function renderTable() {
+        tbody.innerHTML = filtered.map((row, rowIndex) =>
+          `<tr data-index="${rowIndex}">
+            <td><input type="checkbox" class="row-check" data-index="${rowIndex}" ${shortlist.has(rowIndex) ? 'checked' : ''}></td>
+            ${cols.map((c, i) => {
+              const cell = row[c] ?? '';
+              if (i === 3 && cell) {
+                if (cell.match(/\.(jpeg|jpg|gif|png|webp|bmp|svg)(\?.*)?$/i)) {
+                  return `<td><img src="${cell}" alt="Image"></td>`;
+                } else {
+                  return `<td><a href="${cell}" target="_blank" rel="noopener noreferrer">
+                            <button class="view-link-btn">View Link</button>
+                          </a></td>`;
+                }
+              } else {
+                return `<td>${linkify(cell)}</td>`;
+              }
+            }).join('')}
+          </tr>`
+        ).join('');
+
+        document.querySelectorAll('.row-check').forEach((checkbox) => {
+          checkbox.addEventListener('change', (e) => {
+            const index = parseInt(e.target.dataset.index);
+            if (e.target.checked) {
+              shortlist.add(index);
+            } else {
+              shortlist.delete(index);
+            }
+          });
+        });
+      }
+
+      thead.innerHTML = `<tr>
+        <th></th>
+        ${cols.map((c, i) => `<th class="sortable" data-col="${i}">${c}</th>`).join('')}
+      </tr>`;
+
+      function updateSortIndicators() {
+        thead.querySelectorAll('.sortable').forEach(th => {
+          th.classList.remove('sorted-asc', 'sorted-desc');
+          const col = parseInt(th.dataset.col);
+          const state = sortState.find(s => s.colIndex === col);
+          if (state) {
+            th.classList.add(state.order === 'asc' ? 'sorted-asc' : 'sorted-desc');
+          }
+        });
+      }
+
+      thead.querySelectorAll('.sortable').forEach(th => {
+        th.addEventListener('click', (e) => {
+          const colIndex = parseInt(th.dataset.col);
+          const existing = sortState.find(s => s.colIndex === colIndex);
+
+          if (!e.shiftKey) {
+            sortState = [{
+              colIndex,
+              order: existing?.order === 'asc' ? 'desc' : 'asc'
+            }];
+          } else {
+            if (existing) {
+              existing.order = existing.order === 'asc' ? 'desc' : 'asc';
+            } else {
+              sortState.push({ colIndex, order: 'asc' });
+            }
+          }
+
+          updateSortIndicators();
+
+          filtered.sort((a, b) => {
+            for (const { colIndex, order } of sortState) {
+              const colName = cols[colIndex];
+              const valA = (a[colName] || '').toString().toLowerCase();
+              const valB = (b[colName] || '').toString().toLowerCase();
+              if (valA < valB) return order === 'asc' ? -1 : 1;
+              if (valA > valB) return order === 'asc' ? 1 : -1;
+            }
+            return 0;
+          });
+
+          renderTable();
+        });
+      });
+
+      function applyFilters() {
+        const talentFilter = filterTalentInput.value.trim().toLowerCase();
+        const genderFilter = filterGenderSelect.value;
+
+        filtered = data.filter(row => {
+          if (genderFilter) {
+            if (genderFilter.toLowerCase() === 'other') {
+              // Show rows where Gender is NOT 'male' or 'female'
+              if (['male', 'female'].includes((row["Gender"] || '').toLowerCase())) return false;
+            } else {
+              // Match exact 'male' or 'female'
+              if ((row["Gender"] || '').toLowerCase() !== genderFilter.toLowerCase()) return false;
+            }
+          }
+          if (talentFilter && !row["Talent"]?.toLowerCase().includes(talentFilter)) return false;
+          return true;
+        });
+
+        shortlist.clear();
+        sortState = [];
+        updateSortIndicators();
+        renderTable();
+      }
+
+      filterTalentInput.addEventListener('input', applyFilters);
+      filterGenderSelect.addEventListener('change', applyFilters);
+
+      renderTable();
+
+      document.getElementById('downloadBtn').addEventListener('click', () => {
+        const csvRows = [cols.join(',')];
+        shortlist.forEach(i => {
+          const row = cols.map(col => `"${(filtered[i][col] || '').replace(/"/g, '""')}"`).join(',');
+          csvRows.push(row);
+        });
+        const csvContent = csvRows.join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'shortlist.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+    })();
+  </script>
+</body>
+</html>
